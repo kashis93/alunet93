@@ -70,6 +70,7 @@ const App = () => (
               <Route path="/achievements" element={<PrivateRoute><AchievementsPage /></PrivateRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+          </main>
             <Footer />
           </NotificationProvider>
         </AuthProvider>
