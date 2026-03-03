@@ -1,8 +1,15 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  /*
+    Vercel was failing because the secret "vite_api_url" did not exist.
+    The app does not actually depend on this variable, so we can either
+    remove it entirely or provide an empty default value. Keeping it
+    here with a blank string avoids build errors while still allowing
+    the variable to be overridden in the dashboard if needed later.
+  */
   "env": {
-    "VITE_API_URL": "@vite_api_url"
+    "VITE_API_URL": ""
   },
   "regions": ["iad1"],
   "public": false
