@@ -21,12 +21,25 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    include: ['moment'],
-  },
   build: {
     rollupOptions: {
-      external: [],
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules/react')) {
+            return 'react-vendor';
+          }
+          if (id.includes('node_modules/firebase')) {
+            return 'firebase';
+          }
+          if (id.includes('src/features')) {
+            return 'features';
+          }
+          if (id.includes('src/components')) {
+            return 'components';
+          }
+        },
+      },
     },
+    chunkSizeWarningLimit: 1500,
   },
 }));

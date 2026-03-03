@@ -1,0 +1,11 @@
+// Export all components from the opportunities feature
+export { default as Opportunities } from './Opportunities';
+export { default as OpportunityCard } from './OpportunityCard';
+export { default as FilterSidebar } from './FilterSidebar';
+export { default as FilterGroup } from './FilterGroup';
+export { default as SearchBar } from './SearchBar';
+export { default as SortDropdown } from './SortDropdown';
+export { default as ViewToggle } from './ViewToggle';
+export { default as SkillTag } from './SkillTag';
+export { default as AlumniBadge } from './AlumniBadge';
+export { default as RecommendationSection } from './RecommendationSection';
