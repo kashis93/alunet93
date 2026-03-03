@@ -25,7 +25,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Input
+  Input,
+  Avatar,
+  AvatarImage,
+  AvatarFallback
 } from "@/components/ui";
 
 const featureLinks = [
@@ -35,8 +38,7 @@ const featureLinks = [
   { path: "/startup", label: "Startup", icon: Rocket },
   { path: "/events", label: "Events", icon: Calendar },
   { path: "/directory", label: "Directory", icon: Users },
-  { path: "/blogs", label: "Blogs", icon: BarChart3 },
-  { path: "/qna", label: "Q&A", icon: MessageCircle },
+  { path: "/feed", label: "Feed", icon: MessageCircle },
 ];
 
 const Navbar = () => {
@@ -111,10 +113,19 @@ const Navbar = () => {
                       <MessageCircle className="text-white w-5 h-5 hover:text-cyan-400 transition" />
                     </Link>
 
+                    <Link to="/connections" className="relative" title="My Network">
+                      <Users className="text-white w-5 h-5 hover:text-cyan-400 transition" />
+                    </Link>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <User className="text-white w-5 h-5" />
+                      <Button variant="ghost" size="icon" className="p-0">
+                        <Avatar className="h-8 w-8 border-2 border-white/20">
+                          <AvatarImage src={user?.photoURL} />
+                          <AvatarFallback className="bg-cyan-600 text-white">
+                            {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                       </Button>
                     </DropdownMenuTrigger>
 

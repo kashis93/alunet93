@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, Label, Input, Textarea } from "@/components/ui";
 import { motion } from "framer-motion";
 import { challenges as dummyChallenges } from "@/data/dummyData.js";
 import { useAuth } from "@/contexts/AuthContext.jsx";
-import { Trophy, CalendarCheck, Users, Plus, UserPlus, Search, Filter, Briefcase } from "lucide-react";
+import { Trophy, CalendarCheck, Users, Plus, UserPlus } from "lucide-react";
 import { addData } from "@/services/dataService";
 import { sendConnectionRequest } from "@/services/socialService";
 import { db } from "@/services/firebase";
@@ -15,10 +15,6 @@ const Challenges = () => {
   const { user, requireAuth } = useAuth();
   const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState([]);
-  const [selectedDeadline, setSelectedDeadline] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [challengesList, setChallengesList] = useState([]);
   const [posterDetails, setPosterDetails] = useState({});
@@ -30,15 +26,6 @@ const Challenges = () => {
     externalLink: "",
     contactInfo: ""
   });
-
-  // Filter options
-  const categories = ["Data Science", "AI/ML", "Web Development", "Mobile App Development", "Design", "IoT", "Cloud Computing", "Blockchain", "Game Development"];
-  const deadlineRanges = [
-    { label: "This Week", value: "week" },
-    { label: "This Month", value: "month" },
-    { label: "Next 3 Months", value: "quarter" },
-    { label: "More than 3 Months", value: "extended" }
-  ];
 
   useEffect(() => {
     const q = query(collection(db, "challenges"), orderBy("timestamp", "desc"));
@@ -63,6 +50,7 @@ const Challenges = () => {
   }, [user?.uid]);
 
   const handlePost = () => {
+    if (!requireAuth("post")) return;
     setIsDialogOpen(true);
   };
 
@@ -84,39 +72,6 @@ const Challenges = () => {
       toast.error(error.message);
     }
   };
-
-  const filtered = useMemo(() => {
-    return challengesList.filter(c => {
-      const matchesSearch =
-        c.title.toLowerCase().includes(search.toLowerCase()) ||
-        c.description.toLowerCase().includes(search.toLowerCase()) ||
-        (c.postedBy && c.postedBy.toLowerCase().includes(search.toLowerCase()));
-
-      const matchesCategory = selectedCategory.length === 0 || selectedCategory.includes(c.category);
-
-      // Deadline filtering
-      const matchesDeadline = selectedDeadline.length === 0 || (() => {
-        if (!c.deadline) return true;
-        const deadline = new Date(c.deadline);
-        const now = new Date();
-        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const monthFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-        const quarterFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-
-        return selectedDeadline.some(range => {
-          switch (range) {
-            case 'week': return deadline <= weekFromNow;
-            case 'month': return deadline <= monthFromNow;
-            case 'quarter': return deadline <= quarterFromNow;
-            case 'extended': return deadline > quarterFromNow;
-            default: return true;
-          }
-        });
-      })();
-
-      return matchesSearch && matchesCategory && matchesDeadline;
-    });
-  }, [search, selectedCategory, selectedDeadline, challengesList]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -161,138 +116,8 @@ const Challenges = () => {
         )}
       </div>
 
-      {/* Search & Filter */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
-            placeholder="Search challenges, categories, or alumni..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-12 h-14 bg-card border-border/80 rounded-2xl text-base shadow-sm focus:ring-primary/20"
-          />
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowFilters(!showFilters)}
-          className={`h-14 px-6 rounded-2xl gap-2 font-bold border-border/80 ${showFilters ? 'bg-slate-100' : ''}`}
-        >
-          <Filter className="h-5 w-5" />
-          Advanced Filters
-        </Button>
-      </div>
-
-      {/* Advanced Filters */}
-      {showFilters && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          className="overflow-hidden mb-10"
-        >
-          <div className="bg-slate-50 border border-slate-200 p-6 rounded-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-800">Advanced Filters</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSelectedCategory([]);
-                  setSelectedDeadline([]);
-                }}
-              >
-                Clear All
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Category Filter */}
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <Briefcase className="h-4 w-4" /> Category
-                </label>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {categories.map(category => (
-                    <label key={category} className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={selectedCategory.includes(category)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedCategory([...selectedCategory, category]);
-                          } else {
-                            setSelectedCategory(selectedCategory.filter(c => c !== category));
-                          }
-                        }}
-                        className="rounded text-primary"
-                      />
-                      <span className="text-sm">{category}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Deadline Filter */}
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <CalendarCheck className="h-4 w-4" /> Deadline
-                </label>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {deadlineRanges.map(range => (
-                    <label key={range.value} className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={selectedDeadline.includes(range.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedDeadline([...selectedDeadline, range.value]);
-                          } else {
-                            setSelectedDeadline(selectedDeadline.filter(r => r !== range.value));
-                          }
-                        }}
-                        className="rounded text-primary"
-                      />
-                      <span className="text-sm">{range.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Active Filters Summary */}
-            <div className="mt-4 pt-4 border-t border-slate-300">
-              <div className="flex flex-wrap gap-2">
-                {selectedCategory.map(category => (
-                  <span key={category} className="bg-primary text-white px-3 py-1 rounded text-xs font-medium">
-                    {category}
-                    <button
-                      onClick={() => setSelectedCategory(selectedCategory.filter(c => c !== category))}
-                      className="ml-1 text-xs hover:text-red-200"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                {selectedDeadline.map(deadline => (
-                  <span key={deadline} className="bg-primary text-white px-3 py-1 rounded text-xs font-medium">
-                    {deadlineRanges.find(r => r.value === deadline)?.label || deadline}
-                    <button
-                      onClick={() => setSelectedDeadline(selectedDeadline.filter(d => d !== deadline))}
-                      className="ml-1 text-xs hover:text-red-200"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((c, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {challengesList.map((c, i) => (
             <motion.div
               key={c.id}
               initial={{ opacity: 0, y: 20 }}
@@ -365,27 +190,7 @@ const Challenges = () => {
               </p>
             </motion.div>
           ))}
-        </div>
-      ) : (
-        <div className="py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed">
-          <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-            <Search className="h-8 w-8 text-slate-300" />
-          </div>
-          <h3 className="text-2xl font-bold text-slate-800">No challenges found</h3>
-          <p className="text-slate-500 max-w-xs mx-auto mt-2">Try broadening your search or resetting filters.</p>
-          <Button
-            variant="link"
-            className="mt-4 font-bold text-primary"
-            onClick={() => {
-              setSearch("");
-              setSelectedCategory([]);
-              setSelectedDeadline([]);
-            }}
-          >
-            Clear all filters
-          </Button>
-        </div>
-      )}
+      </div>
 
       {/* Post Challenge Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

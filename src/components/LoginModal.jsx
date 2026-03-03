@@ -1,11 +1,13 @@
-
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Label } from "@/components/ui";
-import { useState } from "react";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { GraduationCap } from "lucide-react";
+import { toast } from "sonner";
 
 const LoginModal = () => {
-  const { showLoginModal, setShowLoginModal, login, signup, loginWithGoogle } = useAuth();
+  const { showLoginModal, setShowLoginModal, login, signup, loginWithGoogle, resetPassword, resendVerificationEmail } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -13,6 +15,8 @@ const LoginModal = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [showVerifyNotice, setShowVerifyNotice] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +32,45 @@ const LoginModal = () => {
 
     if (result && !result.success) {
       setError(result.error);
+    } else if (isSignUp && result?.needsVerification) {
+      setShowVerifyNotice(true);
     }
+    setLoading(false);
+  };
+
+  const handleResendVerification = async () => {
+    setError("");
+    setLoading(true);
+    const result = await resendVerificationEmail();
+    if (result?.success) {
+      toast.success("Verification email resent. Check your inbox/spam.");
+    } else {
+      setError(result?.error || "Failed to resend verification email");
+    }
+    setLoading(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError("Please enter your email address");
+      return;
+    }
+    
+    setError("");
+    setLoading(true);
+    
+    try {
+      const result = await resetPassword(email);
+      if (result.success) {
+        toast.success("Password reset email sent! Check your inbox.");
+        setShowPasswordReset(false);
+      } else {
+        setError(result.error);
+      }
+    } catch (error) {
+      setError("Failed to send reset email");
+    }
+    
     setLoading(false);
   };
 
@@ -51,18 +93,34 @@ const LoginModal = () => {
               <GraduationCap className="h-5 w-5 text-primary-foreground" />
             </div>
             <DialogTitle className="text-xl font-bold">
-              {isSignUp ? "Join AluVerse" : "Welcome Back"}
+              {isSignUp ? "Join Alumni Network" : "Welcome Back Alumni"}
             </DialogTitle>
           </div>
           <DialogDescription>
             {isSignUp
-              ? "Create your account to connect with alumni"
+              ? "Create your alumni account to connect with fellow alumni"
               : "Please login to continue"}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           {error && <div className="p-3 text-sm bg-red-50 text-red-600 rounded-lg border border-red-100 font-medium">{error}</div>}
+
+          {showVerifyNotice && (
+            <div className="p-3 text-sm bg-amber-50 text-amber-700 rounded-lg border border-amber-100 font-medium">
+              Verify your email to continue. We sent a verification link to your inbox.
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  className="text-amber-800 underline font-semibold"
+                  disabled={loading}
+                >
+                  Resend verification email
+                </button>
+              </div>
+            </div>
+          )}
 
           {isSignUp && (
             <div className="space-y-2">
@@ -77,17 +135,15 @@ const LoginModal = () => {
             </div>
           )}
 
-          <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
-              placeholder="you@university.edu"
+              placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
@@ -99,6 +155,17 @@ const LoginModal = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            {!isSignUp && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordReset(true)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
 
 
@@ -152,13 +219,55 @@ const LoginModal = () => {
             {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                if (isSignUp) {
+                  setIsSignUp(false);
+                } else {
+                  setShowLoginModal(false);
+                  navigate('/signup');
+                }
+              }}
               className="text-primary font-medium hover:underline"
             >
               {isSignUp ? "Login" : "Sign Up"}
             </button>
           </p>
         </form>
+
+        {/* Password Reset Dialog */}
+        {showPasswordReset && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+              <h3 className="text-lg font-semibold mb-4">Reset Password</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter your email address and we'll send you a link to reset your password.
+              </p>
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mb-4"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPasswordReset(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handlePasswordReset}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  {loading ? "Sending..." : "Send Reset Email"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

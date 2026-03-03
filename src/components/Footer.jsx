@@ -21,7 +21,7 @@ const Footer = () => (
           <div className="space-y-2 text-sm opacity-70">
             <Link to="/events" className="block hover:opacity-100">Events</Link>
             <Link to="/alumni" className="block hover:opacity-100">Alumni Directory</Link>
-            <Link to="/blogs" className="block hover:opacity-100">Blogs</Link>
+            <Link to="/feed" className="block hover:opacity-100">Feed</Link>
             <Link to="/challenges" className="block hover:opacity-100">Challenges</Link>
           </div>
         </div>

@@ -6,11 +6,14 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  sendEmailVerification as firebaseSendEmailVerification
 } from "firebase/auth";
 import { auth, db } from "@/services/firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { getDoc as getDocFn } from "firebase/firestore";
+import { sendWelcomeEmail } from "@/services/emailService";
 
 const AuthContext = createContext(undefined);
 
@@ -30,19 +33,24 @@ export const AuthProvider = ({ children }) => {
             uid: firebaseUser.uid,
             name: firebaseUser.displayName || "User",
             email: firebaseUser.email,
-            role: "student",
+            role: "alumni",
             photoURL: firebaseUser.photoURL || "",
+            emailVerified: firebaseUser.emailVerified,
             createdAt: serverTimestamp()
           };
           await setDoc(doc(db, "users", firebaseUser.uid), userData);
           setUser(userData);
         } else {
+          const data = userDoc.data();
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
-            photoURL: firebaseUser.photoURL,
-            ...userDoc.data()
+            emailVerified: firebaseUser.emailVerified,
+            ...data,
+            // Prefer Firestore profile fields if present (custom uploads), otherwise fall back to Auth
+            photoURL: data?.photoURL || firebaseUser.photoURL,
+            name: data?.name || firebaseUser.displayName || data?.displayName
           });
         }
       } else {
@@ -62,13 +70,17 @@ export const AuthProvider = ({ children }) => {
       const userDoc = await getDoc(doc(db, "users", targetUid));
       if (userDoc.exists()) {
         const firebaseUser = auth.currentUser;
-        setUser({
+        const data = userDoc.data();
+        const userData = {
           uid: targetUid,
           email: firebaseUser?.email,
           displayName: firebaseUser?.displayName,
-          photoURL: firebaseUser?.photoURL,
-          ...userDoc.data()
-        });
+          emailVerified: !!firebaseUser?.emailVerified,
+          ...data,
+          photoURL: data?.photoURL || firebaseUser?.photoURL,
+          name: data?.name || firebaseUser?.displayName || data?.displayName
+        };
+        setUser(userData);
         return true;
       }
       return null;
@@ -78,7 +90,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const signup = async (email, password, name, role = "student") => {
+  const signup = async (email, password, name, role = "alumni") => {
     try {
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(firebaseUser, { displayName: name });
@@ -88,13 +100,21 @@ export const AuthProvider = ({ children }) => {
         name,
         email,
         role,
+        emailVerified: false,
         createdAt: serverTimestamp()
       };
 
       await setDoc(doc(db, "users", firebaseUser.uid), userData);
       setUser(userData);
       setShowLoginModal(false);
-      return { success: true };
+
+      // Send welcome email
+      await sendWelcomeEmail(email, name);
+
+      // Send email verification
+      await firebaseSendEmailVerification(firebaseUser);
+      
+      return { success: true, needsVerification: true };
     } catch (error) {
       console.error("Signup error:", error);
       return { success: false, error: error.message };
@@ -132,6 +152,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const resetPassword = async (email) => {
+    try {
+      await firebaseSendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error) {
+      console.error("Password reset error:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    try {
+      if (!auth.currentUser) {
+        return { success: false, error: "No user logged in" };
+      }
+      await firebaseSendEmailVerification(auth.currentUser);
+      return { success: true };
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const requireAuth = useCallback((_action) => {
     if (!user) {
       setShowLoginModal(true);
@@ -142,11 +185,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkProfileComplete = useCallback((userData) => {
     if (!userData) return false;
-    if (userData.role === "alumni") {
-      return !!(userData.graduationYear && userData.department && userData.company && userData.achievement);
-    } else {
-      return !!(userData.graduationYear && userData.department);
-    }
+    return !!(userData.graduationYear && userData.department && userData.company && userData.achievement);
   }, []);
 
   return (
@@ -160,6 +199,8 @@ export const AuthProvider = ({ children }) => {
       login,
       loginWithGoogle,
       logout,
+      resetPassword,
+      resendVerificationEmail,
       showLoginModal,
       setShowLoginModal,
       requireAuth

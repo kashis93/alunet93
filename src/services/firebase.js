@@ -11,7 +11,7 @@ const firebaseConfig = {
   authDomain: "aluverse93.firebaseapp.com",
   databaseURL: "https://aluverse93-default-rtdb.firebaseio.com",
   projectId: "aluverse93",
-  storageBucket: "aluverse93.firebasestorage.app",
+  storageBucket: "aluverse93.appspot.com",
   messagingSenderId: "866936412039",
   appId: "1:866936412039:web:96b36a79289a805f8c2522",
   measurementId: "G-73Q19S8HTM"
@@ -33,9 +33,11 @@ if (typeof window !== "undefined") {
 
 export const db = getFirestore(app);
 export const rtdb = getDatabase(app);
-// Ensure Storage uses the correct bucket URL. Some Firebase configs use different storageBucket formats;
-// specifying the gs:// URL ensures the SDK targets the right bucket.
-export const storage = getStorage(app, `gs://${firebaseConfig.projectId}.appspot.com`);
+// Initialize Storage using the bucket from Firebase config.
+// IMPORTANT: Do not hardcode the appspot.com bucket; use firebaseConfig.storageBucket to avoid mismatches.
+export const storage = firebaseConfig.storageBucket
+  ? getStorage(app, `gs://${firebaseConfig.storageBucket}`)
+  : getStorage(app);
 
 // For local development you can run the Firebase Storage emulator to avoid CORS issues.
 // Enable by setting VITE_USE_FIREBASE_EMULATOR=true in your .env and running the emulator.

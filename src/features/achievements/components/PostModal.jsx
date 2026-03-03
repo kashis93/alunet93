@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Button } from "@/components/ui";
-import ReactQuill from "react-quill";
-import { ImagePlus, X } from "lucide-react";
-import "react-quill/dist/quill.snow.css";
+import { ImagePlus, X, Bold, Italic, List, ListOrdered } from "lucide-react";
 
 const PostModal = ({
     modalOpen,
@@ -28,33 +26,55 @@ const PostModal = ({
         setProgress(0);
     };
 
-    const customModules = {
-        toolbar: [
-            ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
-            ['blockquote', 'code-block'],
-            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-            ['clean']                                         // remove formatting button
-        ]
+    const insertFormatting = (format) => {
+        const textarea = document.getElementById('post-textarea');
+        if (!textarea) return;
+        
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = status.substring(start, end);
+        
+        let formattedText = selectedText;
+        if (format === 'bold') formattedText = `**${selectedText}**`;
+        if (format === 'italic') formattedText = `*${selectedText}*`;
+        if (format === 'list') formattedText = `\n- ${selectedText}`;
+        if (format === 'ordered') formattedText = `\n1. ${selectedText}`;
+        
+        const newText = status.substring(0, start) + formattedText + status.substring(end);
+        setStatus(newText);
     };
 
     return (
         <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
             <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden border-0 shadow-2xl rounded-3xl">
                 <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                    <DialogTitle className="text-xl font-black text-slate-800">
-                        {isEdit ? "Edit your post" : "Create a post"}
+                        <DialogTitle className="text-xl font-black text-slate-800">
+                            {isEdit ? "Edit your update" : "Share your update"}
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="p-6">
                     <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden mb-4">
-                        <ReactQuill
-                            theme="snow"
+                        <div className="flex gap-2 p-2 border-b border-slate-200 bg-white">
+                            <button type="button" onClick={() => insertFormatting('bold')} className="p-1 hover:bg-slate-100 rounded" title="Bold">
+                                <Bold className="h-4 w-4 text-slate-600" />
+                            </button>
+                            <button type="button" onClick={() => insertFormatting('italic')} className="p-1 hover:bg-slate-100 rounded" title="Italic">
+                                <Italic className="h-4 w-4 text-slate-600" />
+                            </button>
+                            <button type="button" onClick={() => insertFormatting('list')} className="p-1 hover:bg-slate-100 rounded" title="Bullet List">
+                                <List className="h-4 w-4 text-slate-600" />
+                            </button>
+                            <button type="button" onClick={() => insertFormatting('ordered')} className="p-1 hover:bg-slate-100 rounded" title="Numbered List">
+                                <ListOrdered className="h-4 w-4 text-slate-600" />
+                            </button>
+                        </div>
+                        <textarea
+                            id="post-textarea"
                             value={status}
-                            modules={customModules}
-                            placeholder="What do you want to talk about?"
-                            onChange={setStatus}
-                            className="border-0 bg-transparent min-h-[150px] shadow-none prose prose-slate"
+                            onChange={(e) => setStatus(e.target.value)}
+                            placeholder="Share your achievement, failure, experience, or success..."
+                            className="w-full min-h-[150px] p-4 bg-transparent border-0 resize-none focus:outline-none focus:ring-0 text-slate-700"
                         />
                     </div>
 
@@ -109,7 +129,7 @@ const PostModal = ({
                                 disabled={!status.trim() && !postImage && !currentPost?.postImage}
                                 className="rounded-xl px-6 bg-primary hover:bg-primary/90 text-white font-bold disabled:opacity-50"
                             >
-                                {isEdit ? "Update Post" : "Post"}
+                                {isEdit ? "Update" : "Share"}
                             </Button>
                         </div>
                     </div>

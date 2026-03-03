@@ -22,6 +22,8 @@ import slide5 from "@/assets/silde5.jpeg";
 const Home = () => {
   const { user, requireAuth } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [newsIndex, setNewsIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   const heroSlides = [
     { image: heroBg, title: "L.D. College of Engineering" },
@@ -39,6 +41,47 @@ const Home = () => {
     const timer = setInterval(() => setCurrentSlide((prev) => (prev + 1) % heroSlides.length), 4000);
     return () => clearInterval(timer);
   }, [heroSlides.length]);
+
+  const updates = [
+    ...challenges.map((c) => ({
+      id: `c-${c.id}`,
+      type: "Challenge",
+      title: c.title,
+      href: `/challenges/${c.id}`,
+      icon: Target,
+      color: "text-blue-600",
+      bg: "bg-blue-100",
+    })),
+    ...opportunities.slice(0, 10).map((o, i) => ({
+      id: `o-${o.id || i}`,
+      type: "Opportunity",
+      title: `${o.title} • ${o.company}`,
+      href: "/opportunities",
+      icon: Briefcase,
+      color: "text-emerald-600",
+      bg: "bg-emerald-100",
+    })),
+    ...eventsData.slice(0, 10).map((e) => ({
+      id: `e-${e.id}`,
+      type: "Event",
+      title: e.title,
+      href: "/events",
+      icon: Calendar,
+      color: "text-rose-600",
+      bg: "bg-rose-100",
+    })),
+  ];
+
+  useEffect(() => {
+    if (updates.length === 0) return;
+    if (paused) return;
+    const t = setInterval(() => {
+      setNewsIndex((p) => (p + 1) % updates.length);
+    }, 3000);
+    return () => clearInterval(t);
+  }, [paused, updates.length]);
+
+  const visibleUpdates = Array.from({ length: 4 }).map((_, i) => updates[(newsIndex + i) % updates.length]).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -108,6 +151,53 @@ const Home = () => {
           </div>
           <div className="mt-6 text-center">
             <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">{heroSlides[currentSlide].title}</h2>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div
+          className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <span className="text-sm font-bold text-slate-700">Latest Updates</span>
+            </div>
+            <Link to="/challenges" className="text-xs font-semibold text-primary hover:underline">See more</Link>
+          </div>
+          <div className="relative h-56 overflow-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={newsIndex}
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -20, opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                className="absolute inset-0 p-4 space-y-3"
+              >
+                {visibleUpdates.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      to={item.href}
+                      key={item.id}
+                      className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 hover:bg-slate-50 transition"
+                    >
+                      <div className={`h-9 w-9 rounded-full flex items-center justify-center ${item.bg}`}>
+                        <Icon className={`h-5 w-5 ${item.color}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-slate-500">{item.type}</div>
+                        <div className="text-sm font-bold text-slate-800 truncate">{item.title}</div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </section>

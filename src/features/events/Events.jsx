@@ -237,11 +237,25 @@ const Events = () => {
                   </span>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Location</p>
-                  <span className="flex items-center gap-1.5 text-xs font-semibold">
-                    {event.eventType === 'online' ? <Globe className="h-3.5 w-3.5 text-primary" /> : <Building2 className="h-3.5 w-3.5 text-primary" />}
-                    {event.eventType === 'online' ? 'Online Event' : event.location}
-                  </span>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                    {event.eventType === 'online' ? 'Meeting Link' : 'Location'}
+                  </p>
+                  {event.eventType === 'online' ? (
+                    <a
+                      href={event.meetingLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline break-all"
+                    >
+                      <Globe className="h-3.5 w-3.5 text-primary" />
+                      {event.meetingLink || 'Link not provided'}
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold">
+                      <MapPin className="h-3.5 w-3.5 text-primary" />
+                      {event.location || 'Location not provided'}
+                    </span>
+                  )}
                 </div>
               </div>
 

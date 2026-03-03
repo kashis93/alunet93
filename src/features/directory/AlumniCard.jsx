@@ -11,7 +11,8 @@ const AlumniCard = ({ alumni, onConnect, onMessage, index }) => {
         if (imageError) {
             return `https://i.pravatar.cc/150?u=${alumni.id}&s=200`;
         }
-        return alumni.avatar;
+        // Use photoURL first, then fallback to avatar for compatibility
+        return alumni.photoURL || alumni.avatar || `https://ui-avatars.com/api/?name=${alumni.name}&background=random`;
     };
 
     return (

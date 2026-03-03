@@ -474,13 +474,13 @@ const ChallengeDetails = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
             {/* Deadline & Participants */}
             <motion.div
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="bg-white rounded-xl p-6 shadow-lg sticky top-4"
+              className="bg-white rounded-xl p-6 shadow-lg"
             >
               <div className="space-y-4">
                 {/* Countdown Timer */}

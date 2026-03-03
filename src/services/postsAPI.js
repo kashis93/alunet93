@@ -14,14 +14,17 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner"; // using sonner since main project uses it
 
-let postsRef = collection(db, "alumni_posts");
+let postsRef = collection(db, "activities");
 let userRef = collection(db, "users");
 let likeRef = collection(db, "alumni_likes");
 let commentsRef = collection(db, "alumni_comments");
 
 export const postStatus = async (object) => {
   try {
-    await addDoc(postsRef, object);
+    await addDoc(postsRef, {
+      ...object,
+      createdAt: serverTimestamp(),
+    });
     toast.success("Post has been added successfully");
   } catch (err) {
     console.error(err);
@@ -30,18 +33,36 @@ export const postStatus = async (object) => {
 };
 
 export const getStatus = (setAllStatus) => {
-  const q = query(postsRef, orderBy("timeStamp", "desc"));
-  return onSnapshot(q, (response) => {
-    setAllStatus(
-      response.docs.map((docs) => {
+  // Prefer server-side ordering by createdAt; fall back to client sort if missing
+  const q = query(postsRef, orderBy("createdAt", "desc"));
+  return onSnapshot(
+    q,
+    (response) => {
+      const items = response.docs.map((docs) => {
         return { ...docs.data(), id: docs.id };
-      })
-    );
-  });
+      });
+      setAllStatus(items);
+    },
+    (err) => {
+      console.warn("getStatus snapshot error:", err);
+      // Fallback: basic un-ordered snapshot
+      const q2 = query(postsRef);
+      return onSnapshot(q2, (resp2) => {
+        const items = resp2.docs
+          .map((d) => ({ ...d.data(), id: d.id }))
+          .sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() ?? 0;
+            const tb = b.createdAt?.toMillis?.() ?? 0;
+            return tb - ta;
+          });
+        setAllStatus(items);
+      });
+    }
+  );
 };
 
 export const getSingleStatus = (setAllStatus, id) => {
-  const singlePostQuery = query(postsRef, where("userID", "==", id), orderBy("timeStamp", "desc"));
+  const singlePostQuery = query(postsRef, where("authorId", "==", id));
   return onSnapshot(singlePostQuery, (response) => {
     setAllStatus(
       response.docs.map((docs) => {

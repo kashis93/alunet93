@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { likePost, getLikesByUser, postComment, getComments } from "@/services/postsAPI";
-import moment from "moment";
+import { format } from "date-fns";
 import { Heart, MessageCircle, Send } from "lucide-react";
 import { Button, Input, Avatar, AvatarImage, AvatarFallback } from "@/components/ui";
 
@@ -17,13 +17,17 @@ export default function LikeButton({ userId, postId, currentUser }) {
 
     const addComment = () => {
         if (!comment.trim()) return;
-        postComment(postId, comment, moment().format("LLL"), currentUser?.name || currentUser?.displayName, currentUser?.photoURL || currentUser?.imageLink);
+        postComment(postId, comment, format(new Date(), "PPpp"), currentUser?.name || currentUser?.displayName, currentUser?.photoURL || currentUser?.imageLink);
         setComment("");
     };
 
-    useMemo(() => {
-        getLikesByUser(userId, postId, setLiked, setLikesCount);
-        getComments(postId, setComments);
+    useEffect(() => {
+        const unsubLikes = getLikesByUser(userId, postId, setLiked, setLikesCount);
+        const unsubComments = getComments(postId, setComments);
+        return () => {
+            if (typeof unsubLikes === "function") unsubLikes();
+            if (typeof unsubComments === "function") unsubComments();
+        };
     }, [userId, postId]);
 
     return (
