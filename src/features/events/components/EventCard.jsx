@@ -15,10 +15,28 @@ import {
   Link2
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { Button } from '@/components/ui';
+import { sendConnectionRequest } from '@/services/socialService';
 
 const EventCard = ({ event, onShare, onSave, onViewDetails }) => {
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(event.savedBy?.includes(user?.uid));
+  const isOnline = event.mode === 'online';
+  const isOffline = event.mode === 'offline';
+
+  const toJSDate = (v) => {
+    try {
+      if (!v) return new Date();
+      if (typeof v.toDate === 'function') {
+        const d = v.toDate();
+        return isNaN(d.getTime()) ? new Date() : d;
+      }
+      const d = v instanceof Date ? v : new Date(v);
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch {
+      return new Date();
+    }
+  };
 
   const handleShare = () => {
     if (navigator.share) {
@@ -42,10 +60,10 @@ const EventCard = ({ event, onShare, onSave, onViewDetails }) => {
     }
   };
 
-  const isUpcoming = new Date(event.startDate) > new Date();
-  const isPast = new Date(event.endDate) < new Date();
-  const isOnline = event.mode === 'online';
-  const isOffline = event.mode === 'offline';
+  const start = toJSDate(event.startDate);
+  const now = new Date();
+  const isUpcoming = start > now;
+  const isPast = start < now;
 
   const getEventStatusColor = () => {
     if (isPast) return 'bg-gray-100 text-gray-600';
@@ -101,12 +119,8 @@ const EventCard = ({ event, onShare, onSave, onViewDetails }) => {
           {/* Date Badge */}
           <div className="absolute bottom-4 left-4">
             <div className="bg-white/90 backdrop-blur-sm rounded-lg p-2 text-center">
-              <div className="text-lg font-bold text-gray-900">
-                {format(new Date(event.startDate), 'd')}
-              </div>
-              <div className="text-xs text-gray-600 uppercase">
-                {format(new Date(event.startDate), 'MMM')}
-              </div>
+              <div className="text-lg font-bold text-gray-900">{format(start, 'd')}</div>
+              <div className="text-xs text-gray-600 uppercase">{format(start, 'MMM')}</div>
             </div>
           </div>
         </div>
@@ -145,9 +159,7 @@ const EventCard = ({ event, onShare, onSave, onViewDetails }) => {
           {/* Date and Time */}
           <div className="flex items-center text-sm text-gray-600">
             <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-            <span>
-              {format(new Date(event.startDate), 'EEEE, MMMM d, yyyy')} at {format(new Date(event.startDate), 'h:mm a')}
-            </span>
+            <span>{format(start, 'EEEE, MMMM d, yyyy')} at {format(start, 'h:mm a')}</span>
           </div>
 
           {/* Location/Meeting Link */}
@@ -187,6 +199,15 @@ const EventCard = ({ event, onShare, onSave, onViewDetails }) => {
               <span>By {event.organizer}</span>
             </div>
           )}
+          {/* Contact */}
+          {event.organizerEmail && (
+            <div className="flex items-center text-sm text-gray-600">
+              <ExternalLink className="w-4 h-4 mr-2 text-gray-400" />
+              <a href={`mailto:${event.organizerEmail}`} className="text-blue-600 hover:underline">
+                {event.organizerEmail}
+              </a>
+            </div>
+          )}
         </div>
 
         {/* Tags */}
@@ -209,20 +230,44 @@ const EventCard = ({ event, onShare, onSave, onViewDetails }) => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => onViewDetails?.(event)}
-            className="flex-1 py-2.5 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={() => onViewDetails?.(event)} className="rounded-lg">
             View Details
-          </button>
-          
-          <button
-            onClick={handleShare}
-            className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <Share2 className="w-4 h-4" />
-          </button>
+          </Button>
+          {event.registrationLink ? (
+            <Button
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => window.open(event.registrationLink, '_blank', 'noopener,noreferrer')}
+            >
+              Register Now
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="rounded-lg"
+              onClick={handleShare}
+            >
+              Share
+            </Button>
+          )}
+        </div>
+        <div className="mt-3">
+          {event.organizerId && user?.uid !== event.organizerId && (
+            <Button
+              variant="outline"
+              className="w-full rounded-lg"
+              onClick={async () => {
+                try {
+                  await sendConnectionRequest(user, event.organizerId);
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+            >
+              Connect with Organizer
+            </Button>
+          )}
         </div>
 
         {/* Progress Bar for Capacity */}

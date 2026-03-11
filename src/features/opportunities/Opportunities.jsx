@@ -1,13 +1,28 @@
-import React, { useState, useMemo } from 'react';
-import { opportunitiesData } from '@/data/opportunitiesData';
-import FilterSidebar from './FilterSidebar';
-import SearchBar from './SearchBar';
-import SortDropdown from './SortDropdown';
-import ViewToggle from './ViewToggle';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Plus, Filter, LayoutGrid, List, SlidersHorizontal, ArrowUpDown, X, Briefcase, Building2, MapPin, DollarSign, Calendar, ChevronRight } from 'lucide-react';
+import { opportunitiesData, filterOptions } from '@/data/opportunitiesData';
+import { addOpportunity, subscribeToOpportunities } from '@/services/dataService';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import {
+  Button,
+  Input,
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Card,
+  CardContent
+} from '@/components/ui';
 import OpportunityCard from './OpportunityCard';
-import RecommendationSection from './RecommendationSection';
+import FilterSidebar from './FilterSidebar';
+import { cn } from '@/utils';
 
-// initial form template for posting
 const emptyForm = {
   title: '',
   company: '',
@@ -15,406 +30,410 @@ const emptyForm = {
   location: '',
   workMode: 'Remote',
   salary: '',
+  salaryRange: 'Entry',
   deadline: '',
   skills: '',
-  applicationLink: ''
+  applicationLink: '',
+  description: '',
+  department: 'CSE',
+  domain: 'software'
 };
 
 const Opportunities = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('latest');
   const [view, setView] = useState('grid');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showPostForm, setShowPostForm] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
-  const [addedOpportunities, setAddedOpportunities] = useState([]);
-  const [appliedOpportunities, setAppliedOpportunities] = useState({});
-  const [savedOpportunities, setSavedOpportunities] = useState({});
+  const [dbOpportunities, setDbOpportunities] = useState([]);
 
   const [filters, setFilters] = useState({
     opportunityTypes: [],
     departments: [],
     workModes: [],
     experienceLevels: [],
-    salaryRange: [0, 1000000],
+    salaryRange: 'Any',
     companyTypes: [],
-    domains: []
+    education: [],
+    cities: [],
+    industries: [],
+    roleCategories: []
   });
 
-  // Handle filter changes
+  useEffect(() => {
+    const unsub = subscribeToOpportunities((data) => {
+      setDbOpportunities(data);
+    });
+    return unsub;
+  }, []);
+
   const handleFilterChange = (filterName, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [filterName]: value
-    }));
+    setFilters(prev => ({ ...prev, [filterName]: value }));
   };
 
-  // Filter and search logic (includes added posts)
-  const filteredAndSearchedData = useMemo(() => {
-    const allData = [...addedOpportunities, ...opportunitiesData];
+  const filteredData = useMemo(() => {
+    const allData = [...dbOpportunities, ...opportunitiesData];
     return allData.filter(opp => {
-      // Search filter
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch =
-        opp.title.toLowerCase().includes(searchLower) ||
-        opp.company.toLowerCase().includes(searchLower) ||
-        opp.skills.some(skill => skill.toLowerCase().includes(searchLower)) ||
-        opp.postedBy.toLowerCase().includes(searchLower);
-
-      if (!matchesSearch) return false;
-
-      // Opportunity type filter
+      // Filter by Employment Type
       if (filters.opportunityTypes.length > 0) {
-        const typeMap = {
-          'job': 'Job',
-          'internship': 'Internship',
-          'freelance': 'Freelance',
-          'project': 'Project',
-          'startup': 'Startup Role'
-        };
-        if (!filters.opportunityTypes.some(type => typeMap[type] === opp.type)) {
-          return false;
-        }
+        const typeMap = { 'job': 'Job', 'internship': 'Internship', 'freelance': 'Freelance', 'project': 'Project', 'startup': 'Startup Role' };
+        if (!filters.opportunityTypes.some(type => typeMap[type] === opp.type)) return false;
       }
 
-      // Department filter
-      if (filters.departments.length > 0 && !filters.departments.includes(opp.department.toLowerCase())) {
-        return false;
-      }
-
-      // Work mode filter
+      // Filter by Work Mode
       if (filters.workModes.length > 0) {
-        const workModeMap = {
-          'remote': 'Remote',
-          'hybrid': 'Hybrid',
-          'onsite': 'On-site'
-        };
-        if (!filters.workModes.some(mode => workModeMap[mode] === opp.workMode)) {
-          return false;
-        }
+        if (!filters.workModes.some(mode => mode.toLowerCase() === opp.workMode?.toLowerCase())) return false;
       }
 
-      // Salary range filter
-      const salary = opp.salary || opp.stipend || '₹0';
-      const salaryNumber = parseInt(salary.replace(/[₹,\s]/g, '').split('-')[0]) || 0;
-      if (salaryNumber < filters.salaryRange[0] || salaryNumber > filters.salaryRange[1]) {
-        return false;
+      // Filter by Department
+      if (filters.departments.length > 0) {
+        if (!filters.departments.some(dept => dept.toUpperCase() === opp.department?.toUpperCase())) return false;
+      }
+
+      // Filter by Salary Range
+      if (filters.salaryRange !== 'Any' && opp.salary) {
+        const cleanSalary = opp.salary.replace(/,/g, '');
+        const match = cleanSalary.match(/\d+/);
+        let numericSalary = match ? parseInt(match[0]) : 0;
+        if (opp.salary.toLowerCase().includes('lpa')) {
+          numericSalary = numericSalary * 100000;
+        }
+
+        if (filters.salaryRange === 'Entry' && numericSalary > 500000) return false;
+        if (filters.salaryRange === 'Mid' && (numericSalary <= 500000 || numericSalary > 1500000)) return false;
+        if (filters.salaryRange === 'High' && numericSalary <= 1500000) return false;
+      }
+
+      // Filter by City
+      if (filters.cities.length > 0 && opp.location) {
+        if (!filters.cities.some(city => opp.location.toLowerCase().includes(city.toLowerCase()))) return false;
+      }
+
+      // Filter by Industry
+      if (filters.industries.length > 0 && opp.industry) {
+        if (!filters.industries.some(ind => ind.toLowerCase() === opp.industry.toLowerCase())) return false;
+      }
+
+      // Filter by Company Type
+      if (filters.companyTypes.length > 0 && opp.companyType) {
+        if (!filters.companyTypes.some(ct => ct.toLowerCase() === opp.companyType.toLowerCase())) return false;
       }
 
       return true;
     });
-  }, [searchTerm, filters]);
+  }, [dbOpportunities, filters]);
 
-  // Sort logic
   const sortedData = useMemo(() => {
-    const sorted = [...filteredAndSearchedData];
-
-    switch (sortBy) {
-      case 'deadline':
-        sorted.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-        break;
-      case 'applied':
-        sorted.sort((a, b) => b.applicants - a.applicants);
-        break;
-      case 'recommended':
-        sorted.sort((a, b) => {
-          if (a.badge === 'Recommended' && b.badge !== 'Recommended') return -1;
-          if (a.badge !== 'Recommended' && b.badge === 'Recommended') return 1;
-          return 0;
-        });
-        break;
-      case 'latest':
-      default:
-        sorted.sort((a, b) => new Date(b.postedDate) - new Date(a.postedDate));
+    let data = [...filteredData];
+    if (sortBy === 'deadline') {
+      data.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    } else if (sortBy === 'latest') {
+      data.sort((a, b) => new Date(b.postedDate || 0) - new Date(a.postedDate || 0));
     }
+    return data;
+  }, [filteredData, sortBy]);
 
-    return sorted;
-  }, [filteredAndSearchedData, sortBy]);
-
-  const handleApply = (opportunityId) => {
-    setAppliedOpportunities(prev => ({
-      ...prev,
-      [opportunityId]: !prev[opportunityId]
-    }));
-  };
-
-  const handleSave = (opportunityId, isSaved) => {
-    setSavedOpportunities(prev => ({
-      ...prev,
-      [opportunityId]: isSaved
-    }));
-  };
-
-  const handleViewDetails = (opportunityId) => {
-    console.log('View details for opportunity:', opportunityId);
-  };
-
-  // Post opportunity handlers
-  const handleFormChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handlePostSubmit = (e) => {
+  const handlePostSubmit = async (e) => {
     e.preventDefault();
-    // construct new opportunity
-    const newOpp = {
-      id: Date.now().toString(),
-      title: formData.title,
-      company: formData.company,
-      type: formData.type,
-      location: formData.location,
-      workMode: formData.workMode,
-      salary: formData.salary,
-      deadline: formData.deadline,
-      skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
-      postedBy: 'You',
-      applicants: 0,
-      applicationLink: formData.applicationLink,
-      postedDate: new Date().toISOString().split('T')[0],
-      badge: ''
-    };
-    setAddedOpportunities(prev => [newOpp, ...prev]);
-    setFormData(emptyForm);
-    setShowPostForm(false);
-  };
+    try {
+      const skillsArray = typeof formData.skills === 'string'
+        ? formData.skills.split(',').map(s => s.trim()).filter(Boolean)
+        : formData.skills;
 
-  // Get opportunities with applied status
-  const opportunitiesWithStatus = sortedData.map(opp => ({
-    ...opp,
-    applied: appliedOpportunities[opp.id] || false,
-    saved: savedOpportunities[opp.id] || false
-  }));
+      await addOpportunity({
+        ...formData,
+        skills: skillsArray,
+        postedBy: user.displayName || user.name || 'Alumni',
+        authorId: user.uid,
+        postedDate: 'Just now',
+        applicants: 0,
+        logo: null
+      });
+      toast.success('Opportunity posted successfully!');
+      setShowPostForm(false);
+      setFormData(emptyForm);
+    } catch (error) {
+      toast.error('Failed to post opportunity');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      {/* Post Opportunity Modal */}
-      {showPostForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-30">
-          <div className="bg-white p-6 rounded-lg w-full max-w-lg max-h-screen overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">Post Opportunity</h2>
-            <form onSubmit={handlePostSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <input
-                  type="text"
-                  required
-                  placeholder="Title"
-                  value={formData.title}
-                  onChange={(e) => handleFormChange('title', e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
-                />
-                <input
-                  type="text"
-                  required
-                  placeholder="Company"
-                  value={formData.company}
-                  onChange={(e) => handleFormChange('company', e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
-                />
-                <div className="flex gap-2">
-                  <select
-                    value={formData.type}
-                    onChange={(e) => handleFormChange('type', e.target.value)}
-                    className="flex-1 border px-3 py-2 rounded"
-                  >
-                    <option>Job</option>
-                    <option>Internship</option>
-                    <option>Freelance</option>
-                    <option>Project</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Location"
-                    value={formData.location}
-                    onChange={(e) => handleFormChange('location', e.target.value)}
-                    className="flex-1 border px-3 py-2 rounded"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <select
-                    value={formData.workMode}
-                    onChange={(e) => handleFormChange('workMode', e.target.value)}
-                    className="flex-1 border px-3 py-2 rounded"
-                  >
-                    <option>Remote</option>
-                    <option>On-site</option>
-                    <option>Hybrid</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Salary/Stipend"
-                    value={formData.salary}
-                    onChange={(e) => handleFormChange('salary', e.target.value)}
-                    className="flex-1 border px-3 py-2 rounded"
-                  />
-                </div>
-                <input
-                  type="date"
-                  required
-                  value={formData.deadline}
-                  onChange={(e) => handleFormChange('deadline', e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Skills (comma separated)"
-                  value={formData.skills}
-                  onChange={(e) => handleFormChange('skills', e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
-                />
-                <input
-                  type="url"
-                  placeholder="Application Link"
-                  value={formData.applicationLink}
-                  onChange={(e) => handleFormChange('applicationLink', e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
-                />
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowPostForm(false)}
-                  className="px-4 py-2 border rounded"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-teal-500 text-white rounded"
-                >
-                  Post
-                </button>
-              </div>
-            </form>
+    <div className="min-h-screen bg-[#f8fafc]">
+      {/* Header Section - Modern Naukri Style */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between py-4 gap-4">
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                Opportunities<span className="text-blue-600">.</span>
+              </h1>
+              <div className="h-6 w-px bg-gray-200 hidden md:block"></div>
+              <p className="text-sm text-gray-500 hidden md:block font-medium">
+                {sortedData.length} roles found
+              </p>
+            </div>
+
+            <Button
+              onClick={() => setShowPostForm(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-6 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/20 w-full md:w-auto"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Post a Role
+            </Button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Header Section */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Title and Count */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900">Opportunities</h1>
-              <p className="text-gray-600 mt-1">Jobs and internships shared by alumni</p>
-            </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-teal-600">{opportunitiesWithStatus.length}</p>
-              <p className="text-sm text-gray-600">Opportunities Found</p>
-              <button
-                onClick={() => setShowPostForm(true)}
-                className="mt-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all text-sm">
-                + Post Opportunity
-              </button>
-            </div>
-          </div>
-
-          {/* Search bar row */}
-          <div className="mb-4">
-            <SearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-          </div>
-
-          {/* Controls row */}
-          <div className="flex flex-wrap items-center gap-3">
-            <SortDropdown sortBy={sortBy} onSortChange={setSortBy} />
-            <ViewToggle view={view} onViewChange={setView} />
-            <button
-              onClick={() => setIsFilterOpen(prev => !prev)}
-              className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors text-sm font-medium text-gray-700"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707l-6.414-6.414A1 1 0 013 6.586V4z" />
-              </svg>
-              Filters
-            </button>
-          </div>
-
-          {/* Inline filters section */}
-          {isFilterOpen && (
-            <div className="mt-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex gap-8">
+          {/* Amazon-style Sidebar Filters */}
+          <aside className="hidden lg:block w-72 flex-shrink-0">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-blue-600" />
+                  Filter Options
+                </h3>
+                <button
+                  onClick={() => setFilters({ opportunityTypes: [], departments: [], workModes: [], experienceLevels: [], salaryRange: 'Any', companyTypes: [], education: [], cities: [] })}
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                >
+                  Reset
+                </button>
+              </div>
               <FilterSidebar
-                inline={true}
-                onClose={() => setIsFilterOpen(false)}
+                isOpen={true}
                 filters={filters}
                 onFilterChange={handleFilterChange}
+                inline={true}
               />
             </div>
-          )}
+          </aside>
+
+          {/* Main Content Area */}
+          <main className="flex-1 group">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  className="lg:hidden flex items-center gap-2 text-gray-600"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </Button>
+                <div className="flex items-center bg-white border border-gray-200 rounded-lg p-1">
+                  <button
+                    onClick={() => setView('grid')}
+                    className={cn("p-1.5 rounded-md transition-all", view === 'grid' ? "bg-gray-100 text-blue-600 shadow-sm" : "text-gray-400 hover:bg-gray-50")}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setView('list')}
+                    className={cn("p-1.5 rounded-md transition-all", view === 'list' ? "bg-gray-100 text-blue-600 shadow-sm" : "text-gray-400 hover:bg-gray-50")}
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                  <ArrowUpDown className="h-4 w-4" />
+                  Sort:
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-transparent border-none focus:ring-0 text-blue-600 font-bold cursor-pointer"
+                  >
+                    <option value="latest">Latest first</option>
+                    <option value="deadline">Deadline soon</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {sortedData.length > 0 ? (
+              <div className={cn("grid gap-6 transition-all", view === 'grid' ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
+                {sortedData.map((opp) => (
+                  <OpportunityCard
+                    key={opp.id}
+                    opportunity={opp}
+                    onViewDetails={(id) => console.log('View', id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-gray-200 p-12 text-center shadow-sm">
+                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Briefcase className="h-10 w-10 text-gray-300" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">No matching opportunities</h3>
+                <p className="text-gray-500 mb-8 max-w-sm mx-auto">
+                  Try adjusting your keywords or filters to see more results from our alumni network.
+                </p>
+                <Button
+                  onClick={() => setSearchTerm('')}
+                  variant="outline"
+                  className="rounded-full px-8"
+                >
+                  Clear search
+                </Button>
+              </div>
+            )}
+          </main>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Main Feed */}
-        <main className="flex-1 min-w-0">
-          {/* Recommendation Section */}
-          {opportunitiesWithStatus.length > 0 && (
-            <RecommendationSection
-              opportunities={opportunitiesWithStatus}
-              onApply={handleApply}
-              onViewDetails={handleViewDetails}
-            />
-          )}
+      {/* Post Opportunity Modal - Professional Form */}
+      <Dialog open={showPostForm} onOpenChange={setShowPostForm}>
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-3xl max-h-[90vh] flex flex-col">
+          <div className="bg-blue-600 p-8 text-white relative">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">Post an Opportunity</DialogTitle>
+              <DialogDescription className="text-blue-100 text-sm mt-1">
+                Help your juniors and fellow alumni find their next big move by sharing relevant job roles.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="absolute -right-4 -bottom-4 opacity-10">
+              <Building2 className="h-32 w-32" />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-thin scrollbar-thumb-gray-200">
+            <form onSubmit={handlePostSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2 col-span-2">
+                  <label className="text-sm font-bold text-gray-700">Opportunity Title</label>
+                  <div className="max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
+                    <form onSubmit={handlePostSubmit} className="space-y-6 pt-4 pb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Opportunity Title</label>
+                          <Input
+                            placeholder="e.g. Senior Software Engineer"
+                            required
+                            value={formData.title}
+                            onChange={e => setFormData({ ...formData, title: e.target.value })}
+                            className="rounded-xl border-slate-200 h-12 focus:ring-blue-500"
+                          />
+                        </div>
 
-          {/* Opportunities Feed */}
-          {opportunitiesWithStatus.length > 0 ? (
-            <div
-              className={`grid gap-6 ${
-                view === 'grid'
-                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                  : 'grid-cols-1'
-              }`}
-            >
-              {opportunitiesWithStatus.map((opportunity) => (
-                <OpportunityCard
-                  key={opportunity.id}
-                  opportunity={opportunity}
-                  onApply={handleApply}
-                  onSave={handleSave}
-                  onViewDetails={handleViewDetails}
-                />
-              ))}
-            </div>
-          ) : (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="w-32 h-32 mb-6 bg-gray-100 rounded-full flex items-center justify-center">
-                <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">No opportunities found</h3>
-              <p className="text-gray-600 text-center mb-6 max-w-md">
-                Try adjusting your filters or search terms to find opportunities that match your interests.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setFilters({
-                      opportunityTypes: [],
-                      departments: [],
-                      workModes: [],
-                      experienceLevels: [],
-                      salaryRange: [0, 1000000],
-                      companyTypes: [],
-                      domains: []
-                    });
-                  }}
-                  className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all"
-                >
-                  Clear Filters
-                </button>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
-  );
+                        <div className="space-y-2">
+                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Company Name</label>
+                          <Input
+                            placeholder="e.g. Google India"
+                            required
+                            value={formData.company}
+                            onChange={e => setFormData({ ...formData, company: e.target.value })}
+                            className="rounded-xl border-slate-200 h-12"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Location</label>
+                          <Input
+                            placeholder="e.g. Bangalore, KA"
+                            required
+                            value={formData.location}
+                            onChange={e => setFormData({ ...formData, location: e.target.value })}
+                            className="rounded-xl border-slate-200 h-12"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Work Mode</label>
+                          <select
+                            className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
+                            value={formData.workMode}
+                            onChange={e => setFormData({ ...formData, workMode: e.target.value })}
+                          >
+                            <option value="On-site">On-site</option>
+                            <option value="Remote">Remote</option>
+                            <option value="Hybrid">Hybrid</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Job Type</label>
+                          <select
+                            className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
+                            value={formData.type}
+                            onChange={e => setFormData({ ...formData, type: e.target.value })}
+                          >
+                            <option value="Full-time">Full-time</option>
+                            <option value="Internship">Internship</option>
+                            <option value="Contract">Contract</option>
+                            <option value="Part-time">Part-time</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Application Deadline</label>
+                          <Input
+                            type="date"
+                            required
+                            value={formData.deadline}
+                            onChange={e => setFormData({ ...formData, deadline: e.target.value })}
+                            className="rounded-xl border-slate-200 h-12"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Salary / Stipend</label>
+                        <Input
+                          placeholder="e.g. 12LPA - 15LPA or 25k/month"
+                          value={formData.salary}
+                          onChange={e => setFormData({ ...formData, salary: e.target.value })}
+                          className="rounded-xl border-slate-200 h-12"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Application Link / Email</label>
+                        <Input
+                          placeholder="https://company.com/apply or careers@company.com"
+                          required
+                          value={formData.applicationLink}
+                          onChange={e => setFormData({ ...formData, applicationLink: e.target.value })}
+                          className="rounded-xl border-slate-200 h-12"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Required Skills (comma separated)</label>
+                        <Input
+                          placeholder="React, Node.js, Python..."
+                          value={formData.skills}
+                          onChange={e => setFormData({ ...formData, skills: e.target.value })}
+                          className="rounded-xl border-slate-200 h-12"
+                        />
+                      </div>
+
+                      <div className="flex gap-4 pt-6 sticky bottom-0 bg-white border-t border-slate-50">
+                        <Button type="button" variant="outline" onClick={() => setShowPostForm(false)} className="flex-1 rounded-xl h-12 font-black uppercase tracking-widest text-xs">
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-500/20">
+                          Publish Job
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          );
 };
 
-export default Opportunities;
+          export default Opportunities;
+          ```

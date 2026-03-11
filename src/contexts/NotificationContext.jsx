@@ -5,6 +5,7 @@ import {
   subscribeToConnections,
   subscribeToActivities,
   subscribeToIncomingMessages,
+  getSuggestions
 } from "@/services/socialService";
 import { toast } from "sonner";
 import { db } from "@/services/firebase";
@@ -21,6 +22,7 @@ export const NotificationProvider = ({ children }) => {
   const [lastRequestIds, setLastRequestIds] = useState(new Set());
   const [lastMessageIds, setLastMessageIds] = useState(new Set());
   const [senderData, setSenderData] = useState({});
+  const [suggestions, setSuggestions] = useState([]);
 
   // Subscribe to incoming connection requests
   useEffect(() => {
@@ -43,7 +45,7 @@ export const NotificationProvider = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [user?.uid, lastRequestIds]);
 
   // Subscribe to messages and fetch sender info
   useEffect(() => {
@@ -86,7 +88,7 @@ export const NotificationProvider = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [user?.uid, messages, senderData]);
 
   // Subscribe to activities
   useEffect(() => {
@@ -108,6 +110,12 @@ export const NotificationProvider = ({ children }) => {
     return () => unsubConnections();
   }, [user?.uid]);
 
+  // Fetch suggestions
+  useEffect(() => {
+    if (!user?.uid) return;
+    getSuggestions(user.uid).then(setSuggestions).catch(console.error);
+  }, [user?.uid]);
+
   // Calculate total unread notifications
   const totalNotifications = connectionRequests.length + messages.length;
 
@@ -126,6 +134,7 @@ export const NotificationProvider = ({ children }) => {
         activities,
         unreadCount,
         totalNotifications,
+        suggestions
       }}
     >
       {children}

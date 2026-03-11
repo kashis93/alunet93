@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { db } from '@/services/firebase';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { deleteFileByUrl } from '@/utils/firebaseUpload.js';
 
 const PostSimpleFixed = ({ post }) => {
   const { user } = useAuth();
@@ -14,6 +17,46 @@ const PostSimpleFixed = ({ post }) => {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
+  const [idx, setIdx] = useState(0);
+
+  const toJSDate = (v) => {
+    try {
+      if (!v) return new Date();
+      if (typeof v.toDate === 'function') {
+        const d = v.toDate();
+        return isNaN(d.getTime()) ? new Date() : d;
+      }
+      const d = v instanceof Date ? v : new Date(v);
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch {
+      return new Date();
+    }
+  };
+
+  const isOwner = !!user?.uid && ((post?.authorId === user.uid) || (post?.userId === user.uid));
+
+  const handleDelete = async () => {
+    if (!isOwner) return;
+    const ok = window.confirm('Delete this post? This action cannot be undone.');
+    if (!ok) return;
+    setLoading(true);
+    try {
+      if (Array.isArray(post.images)) {
+        for (const url of post.images) {
+          await deleteFileByUrl(url).catch(() => { });
+        }
+      }
+      if (post.image) await deleteFileByUrl(post.image).catch(() => { });
+      if (post.video) await deleteFileByUrl(post.video).catch(() => { });
+      await deleteDoc(doc(db, 'posts', post.id));
+      toast.success('Post deleted');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to delete post');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (post) {
@@ -22,10 +65,14 @@ const PostSimpleFixed = ({ post }) => {
       setComments(post.comments || []);
       setLikeCount(post.likes?.length || 0);
       setCommentCount(post.comments?.length || 0);
-      
+
       // Check if current user liked this post
       if (user && post.likes) {
-        setIsLiked(post.likes.includes(user.uid));
+        // post.likes may be an array of userIds or objects; support both
+        const liked = Array.isArray(post.likes)
+          ? post.likes.some(l => (typeof l === 'string' ? l === user.uid : l?.userId === user.uid))
+          : false;
+        setIsLiked(liked);
       }
     }
   }, [post, user]);
@@ -45,18 +92,17 @@ const PostSimpleFixed = ({ post }) => {
 
       // Save like to Firebase
       const postRef = doc(db, "posts", post.id);
-      await updateDoc(postRef, {
-        likes: newIsLiked ? [...(likes || []), { userId: user.uid, timestamp: new Date() }] : (likes || []).filter(like => like.userId !== user.uid),
-        likeCount: newIsLiked ? likeCount + 1 : likeCount - 1,
-        updatedAt: new Date()
-      });
+      const nextLikes = newIsLiked
+        ? [...(likes || []), user.uid]
+        : (likes || []).filter(like => (typeof like === 'string' ? like !== user.uid : like?.userId !== user.uid));
+      await updateDoc(postRef, { likes: nextLikes });
       // For now, we'll just update the local state
     } catch (error) {
       console.error('Error liking post:', error);
       toast.error('Failed to like post');
       // Revert state on error
       setIsLiked(!isLiked);
-      setLikeCount(prev => newIsLiked ? prev - 1 : prev + 1);
+      setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
     } finally {
       setLoading(false);
     }
@@ -114,21 +160,36 @@ const PostSimpleFixed = ({ post }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
       {/* Post Header */}
-      <div className="flex items-center space-x-3 mb-3">
-        <img
-          src={post.authorPhoto || `https://ui-avatars.com/api/?name=${post.authorName}&background=random`}
-          alt={post.authorName}
-          className="w-10 h-10 rounded-full object-cover"
-        />
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900">{post.authorName}</h3>
-          <p className="text-xs text-gray-500">
-            {post.authorRole} • {post.createdAt ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true }) : 'Just now'}
-          </p>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-3">
+          <img
+            src={post.authorPhoto || `https://ui-avatars.com/api/?name=${post.authorName}&background=random`}
+            alt={post.authorName}
+            className="w-10 h-10 rounded-full object-cover"
+          />
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900">{post.authorName}</h3>
+            <p className="text-xs text-gray-500">
+              {post.authorRole} • {post.createdAt ? formatDistanceToNow(toJSDate(post.createdAt), { addSuffix: true }) : 'Just now'}
+            </p>
+          </div>
         </div>
-        <button className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-          <MoreHorizontal className="w-4 h-4 text-gray-400" />
-        </button>
+        <div className="flex items-center gap-1">
+          {isOwner && (
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-50 rounded-md transition-colors text-xs"
+              title="Delete post"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete</span>
+            </button>
+          )}
+          <button className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+            <MoreHorizontal className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
       </div>
 
       {/* Post Content */}
@@ -136,16 +197,60 @@ const PostSimpleFixed = ({ post }) => {
         <p className="text-gray-900 text-sm whitespace-pre-wrap">{post.content}</p>
       </div>
 
-      {/* Post Image */}
-      {post.image && (
-        <div className="mb-3 rounded-lg overflow-hidden">
+      {/* Post Media (carousel for multiple images) */}
+      {Array.isArray(post.images) && post.images.length > 0 ? (
+        <div className="mb-3 rounded-lg overflow-hidden relative bg-black">
+          {(() => {
+            const count = post.images.length;
+            const safeIdx = ((idx % count) + count) % count;
+            return (
+              <>
+                <img
+                  src={post.images[safeIdx]}
+                  alt={`Post image ${safeIdx + 1} of ${count}`}
+                  className="w-full max-h-96 object-contain bg-black"
+                />
+                {count > 1 && (
+                  <>
+                    <button
+                      onClick={() => setIdx((v) => v - 1)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setIdx((v) => v + 1)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                      {post.images.map((_, i) => (
+                        <span
+                          key={i}
+                          className={`h-1.5 w-1.5 rounded-full ${i === safeIdx ? 'bg-white' : 'bg-white/50'}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      ) : post.image ? (
+        <div className="mb-3 rounded-lg overflow-hidden bg-black">
           <img
             src={post.image}
             alt="Post image"
-            className="w-full h-auto max-h-96 object-cover"
+            className="w-full max-h-96 object-contain bg-black"
           />
         </div>
-      )}
+      ) : post.video ? (
+        <div className="mb-3 rounded-lg overflow-hidden bg-black">
+          <video src={post.video} controls className="w-full max-h-96" />
+        </div>
+      ) : null}
 
       {/* Engagement Stats */}
       {(likeCount > 0 || commentCount > 0) && (
@@ -164,11 +269,10 @@ const PostSimpleFixed = ({ post }) => {
         <button
           onClick={handleLike}
           disabled={loading}
-          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors ${
-            isLiked 
-              ? 'text-red-600 hover:bg-red-50' 
+          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors ${isLiked
+              ? 'text-red-600 hover:bg-red-50'
               : 'text-gray-600 hover:bg-gray-100'
-          } ${loading ? 'opacity-50' : ''}`}
+            } ${loading ? 'opacity-50' : ''}`}
         >
           <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
           <span className="text-sm">{likeCount}</span>
@@ -194,6 +298,18 @@ const PostSimpleFixed = ({ post }) => {
       {/* Comments Section */}
       {showComments && (
         <div className="mt-4 pt-4 border-t border-gray-100">
+          {isOwner && (
+            <div className="flex justify-end pb-2">
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Post
+              </button>
+            </div>
+          )}
           {/* Add Comment */}
           {user && (
             <form onSubmit={handleComment} className="mb-4">
@@ -240,11 +356,11 @@ const PostSimpleFixed = ({ post }) => {
                   />
                   <div className="flex-1">
                     <div className="bg-gray-50 rounded-lg p-3">
-                      <h4 className="font-medium text-gray-900 text-sm">{comment.userName}</h4>
+                      <h4 className="font-medium text-gray-900 text-sm">{comment.userName || comment.authorName}</h4>
                       <p className="text-gray-700 text-sm mt-1">{comment.content}</p>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                      {formatDistanceToNow(toJSDate(comment.createdAt), { addSuffix: true })}
                     </p>
                   </div>
                 </div>

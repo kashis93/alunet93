@@ -6,10 +6,6 @@ const Leaderboard = () => {
 
   return (
     <div className="container mx-auto px-4 py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold">Leaderboard</h1>
-        <p className="text-muted-foreground mt-1">Top contributors across the community</p>
-      </div>
 
       <div className="bg-card rounded-xl overflow-hidden border border-border">
         <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-medium text-muted-foreground">

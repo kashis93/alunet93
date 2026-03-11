@@ -49,7 +49,7 @@ if (typeof window !== "undefined") {
       connectStorageEmulator(storage, 'localhost', 9199);
       console.info('Connected Storage to emulator at localhost:9199');
     }
-  } catch (e) {
+  } catch {
     // ignore when import.meta.env isn't available in some environments
   }
 }

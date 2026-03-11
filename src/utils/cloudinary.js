@@ -1,4 +1,13 @@
 // Cloudinary upload configuration using fetch
+import { Cloudinary } from '@cloudinary/url-gen';
+
+// Create a Cloudinary instance
+export const cld = new Cloudinary({
+  cloud: {
+    cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dv0heb3cz'
+  }
+});
+
 export const uploadImage = async (file) => {
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dv0heb3cz';
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'alumni_uploads';

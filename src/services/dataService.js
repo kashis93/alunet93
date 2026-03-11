@@ -1,5 +1,36 @@
 import { db } from "./firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "firebase/firestore";
+
+/**
+ * Listen for startups in real-time
+ */
+export const subscribeToStartups = (callback) => {
+    const q = query(collection(db, "startups"), orderBy("timestamp", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const startups = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        callback(startups);
+    });
+};
+
+/**
+ * Listen for opportunities in real-time
+ */
+export const subscribeToOpportunities = (callback) => {
+    const q = query(collection(db, "opportunities"), orderBy("timestamp", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const opportunities = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            // Map Firestore fields to match local expected fields if necessary
+            postedDate: doc.data().timestamp?.toDate?.().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+        }));
+        callback(opportunities);
+    });
+};
+
 
 /**
  * Add a new document to a collection
@@ -65,4 +96,28 @@ export const addBlog = async (blog, user) => {
         authorRole: user.role || "Alumni",
         userId: user.uid
     });
+};
+
+/**
+ * Specifically for startups
+ */
+export const addStartup = async (startup, user) => {
+    const result = await addData("startups", {
+        ...startup,
+        founder: user.displayName || user.name || "Anonymous",
+        userId: user.uid
+    });
+
+    if (result.success) {
+        // Create activity for connections
+        await addData("activities", {
+            type: "startup",
+            title: startup.title,
+            authorId: user.uid,
+            authorName: user.displayName || user.name,
+            refId: result.id,
+            content: startup.description
+        });
+    }
+    return result;
 };

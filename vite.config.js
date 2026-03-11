@@ -8,12 +8,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    strictPort: true,
     allowedHosts: [
       'hindu-mit-dude-monitor.trycloudflare.com',
     ],
     hmr: {
       overlay: false,
     },
+    cors: true,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

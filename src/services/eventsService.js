@@ -13,8 +13,7 @@ import {
   onSnapshot, 
   serverTimestamp, 
   arrayUnion, 
-  arrayRemove,
-  increment 
+  arrayRemove
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 

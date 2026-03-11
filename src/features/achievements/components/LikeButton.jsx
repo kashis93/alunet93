@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { likePost, getLikesByUser, postComment, getComments } from "@/services/postsAPI";
 import { format } from "date-fns";
 import { Heart, MessageCircle, Send } from "lucide-react";
@@ -21,13 +21,9 @@ export default function LikeButton({ userId, postId, currentUser }) {
         setComment("");
     };
 
-    useEffect(() => {
-        const unsubLikes = getLikesByUser(userId, postId, setLiked, setLikesCount);
-        const unsubComments = getComments(postId, setComments);
-        return () => {
-            if (typeof unsubLikes === "function") unsubLikes();
-            if (typeof unsubComments === "function") unsubComments();
-        };
+    useMemo(() => {
+        getLikesByUser(userId, postId, setLiked, setLikesCount);
+        getComments(postId, setComments);
     }, [userId, postId]);
 
     return (
@@ -101,3 +97,5 @@ export default function LikeButton({ userId, postId, currentUser }) {
         </div>
     );
 }
+
+

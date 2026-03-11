@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { sendConnectionRequest, getOrCreateChat } from "@/services/socialService";
 import { addData } from "@/services/dataService";
@@ -27,7 +27,8 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 const Directory = () => {
   const { user, requireAuth } = useAuth();
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("search") || "");
   const [selectedDept, setSelectedDept] = useState("All");
   const [selectedYear, setSelectedYear] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
@@ -98,7 +99,7 @@ const Directory = () => {
     // Always include both noteworthy and firestore alumni
     // Combine them and remove duplicates if any (by name or id)
     const combined = [...normalizedNoteworthy, ...firestoreAlumni];
-    
+
     // If we have firestore alumni, we can also add dummy data if combined is too small
     if (combined.length < 5) {
       return [...combined, ...dummyAlumni];
@@ -156,18 +157,18 @@ const Directory = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 pb-20">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
-            Alumni <span className="text-gradient">Directory</span>
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm max-w-xl">
-            {alumni.length}+ professionals. Find mentors, classmates, and industry experts.
-          </p>
+      {/* Search and Filters Bar */}
+      <div className="flex flex-col md:flex-row gap-4 mb-4 items-center">
+        <div className="flex-1 w-full relative">
+          <SearchBar
+            placeholder="Search by name, company, or department..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full shadow-sm"
+          />
         </div>
 
-        <div className="flex bg-secondary/50 p-1 rounded-lg border border-border/50 self-start md:self-auto">
+        <div className="flex bg-secondary/50 p-1 rounded-lg border border-border/50 self-start md:self-auto shrink-0">
           {["All", "Mentors", "LAA Member"].map((tab) => (
             <button
               key={tab}
@@ -181,45 +182,10 @@ const Directory = () => {
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Discovery Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        {categoryCards.map((card, i) => (
-          <motion.div
-            key={card.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            onClick={card.filter}
-            className="group cursor-pointer bg-card hover:bg-primary/5 p-4 rounded-xl border border-border/50 hover:border-primary/20 transition-all shadow-sm relative overflow-hidden"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${card.color} text-white shrink-0`}>
-                <card.icon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-bold text-xs group-hover:text-primary transition-colors truncate">{card.title}</h3>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase truncate">{card.count} {card.title.includes("Dept") ? "Depts" : card.title.includes("Batch") ? "Batches" : "Members"}</p>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Search and Filters Bar */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="flex-1 relative">
-          <SearchBar
-            placeholder="Search by name, company, or department..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full shadow-sm"
-          />
-        </div>
         <Button
           variant="outline"
-          className={`gap-2 md:w-auto w-full border-border/60 ${showFilters ? "bg-secondary" : ""}`}
+          className={`gap-2 md:w-auto w-full border-border/60 shrink-0 ${showFilters ? "bg-secondary" : ""}`}
           onClick={() => setShowFilters(!showFilters)}
         >
           <Filter className="h-4 w-4" />
@@ -354,8 +320,8 @@ const Directory = () => {
           <h2 className="text-2xl font-bold mb-3">Join our Alumni Association?</h2>
           <p className="text-muted-foreground">Register as an LAA Member to get exclusive access to events, career counseling, and networking opportunities.</p>
         </div>
-        <Button 
-          onClick={handleApplyMembership} 
+        <Button
+          onClick={handleApplyMembership}
           disabled={applying}
           className="gradient-primary text-primary-foreground px-8 py-6 rounded-2xl font-bold text-lg shadow-xl shadow-primary/20"
         >

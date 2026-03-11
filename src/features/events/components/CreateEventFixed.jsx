@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Calendar, MapPin, Video, Upload, Hash, Clock, Image as ImageIcon } from 'lucide-react';
-import { uploadAsDataURL } from '../../../utils/dataURLUpload';
+import { X, Calendar, MapPin, Video, Upload, Hash, Clock, Link as LinkIcon, AtSign, Image as ImageIcon } from 'lucide-react';
+import { uploadImageToFirebase } from '@/utils/firebaseUpload.js';
 import { useAuth } from '../../../contexts/AuthContext';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -10,18 +10,18 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [coverImage, setCoverImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     title: '',
-    headline: '',
+    shortDescription: '',
     description: '',
     startDate: '',
     startTime: '',
-    endDate: '',
-    endTime: '',
     mode: 'offline',
     location: '',
     meetingLink: '',
+    registrationLink: '',
+    contactInfo: '',
     tags: '',
     organizer: user?.displayName || '',
     organizerEmail: user?.email || ''
@@ -38,7 +38,7 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
   const handleImageSelect = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
+      if (!['image/jpeg', 'image/png'].includes(file.type)) {
         toast.error('Please select an image file');
         return;
       }
@@ -64,60 +64,66 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
     setLoading(true);
 
     try {
-      // Upload cover image if provided
-      let imageData = null;
+      // Upload cover image if provided (Storage; store URL)
+      let coverUrl = null;
       if (coverImage) {
-        imageData = await uploadAsDataURL(coverImage);
+        const up = await uploadImageToFirebase(coverImage, 'events/banners');
+        coverUrl = up?.url || null;
       }
 
-      // Process tags
-      const tags = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      // Process hashtags/keywords (allow # prefix and comma separation)
+      const tags = formData.tags
+        .split(/[, ]+/)
+        .map(tag => tag.replace(/^#/, '').trim())
+        .filter(Boolean);
 
-      // Combine date and time into proper Date objects
+      // Combine date and time into proper Date object
       const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
-      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+      if (isNaN(startDateTime.getTime())) {
+        toast.error('Please select a valid date and time');
+        setLoading(false);
+        return;
+      }
 
       const eventData = {
         title: formData.title,
-        headline: formData.headline,
-        description: formData.description,
+        description: formData.description || formData.shortDescription || '',
         startDate: startDateTime,
-        startTime: formData.startTime,
-        endDate: endDateTime,
-        endTime: formData.endTime,
         mode: formData.mode,
         location: formData.location,
         meetingLink: formData.meetingLink,
+        registrationLink: formData.registrationLink || '',
+        contactInfo: formData.contactInfo || '',
         tags: tags,
         organizer: formData.organizer,
         organizerEmail: formData.organizerEmail,
         organizerId: user.uid,
-        coverImage: imageData?.url || null,
+        coverImage: coverUrl,
         createdAt: new Date(),
         updatedAt: new Date()
       };
 
       await onEventCreate(eventData);
-      
+
       // Reset form
       setFormData({
         title: '',
-        headline: '',
+        shortDescription: '',
         description: '',
         startDate: '',
         startTime: '',
-        endDate: '',
-        endTime: '',
         mode: 'offline',
         location: '',
         meetingLink: '',
+        registrationLink: '',
+        contactInfo: '',
         tags: '',
         organizer: user?.displayName || '',
         organizerEmail: user?.email || ''
       });
       removeImage();
       onClose?.();
-      
+
     } catch (error) {
       console.error('Error creating event:', error);
       toast.error('Failed to create event. Please try again.');
@@ -145,7 +151,7 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
         {/* Cover Image */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Event Photo (Optional)
+            Event Photo (JPG/PNG)
           </label>
           <div className="relative">
             {imagePreview ? (
@@ -167,10 +173,10 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
               <label className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors">
                 <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
                 <span className="text-sm text-gray-600">Click to upload event photo</span>
-                <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB</span>
+                <span className="text-xs text-gray-500 mt-1">JPG, PNG up to 10MB</span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png"
                   onChange={handleImageSelect}
                   className="hidden"
                 />
@@ -198,14 +204,14 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
 
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Headline (for online events)
+              Short Description
             </label>
             <input
               type="text"
-              name="headline"
-              value={formData.headline}
+              name="shortDescription"
+              value={formData.shortDescription}
               onChange={handleInputChange}
-              placeholder="Enter event headline (e.g., 'Tech Talk: AI in Alumni Network')"
+              placeholder="2–3 lines describing the event"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
           </div>
@@ -258,36 +264,6 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
               required
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Date *
-            </label>
-            <input
-              type="date"
-              name="endDate"
-              value={formData.endDate}
-              onChange={handleInputChange}
-              min={formData.startDate || format(new Date(), 'yyyy-MM-dd')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Clock className="w-4 h-4 inline mr-1" />
-              End Time *
-            </label>
-            <input
-              type="time"
-              name="endTime"
-              value={formData.endTime}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              required
-            />
-          </div>
         </div>
 
         {/* Event Mode */}
@@ -304,11 +280,10 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
                 key={mode.value}
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, mode: mode.value }))}
-                className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                  formData.mode === mode.value
+                className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg border-2 transition-all ${formData.mode === mode.value
                     ? 'border-blue-500 bg-blue-50 text-blue-700'
                     : 'border-gray-300 hover:border-gray-400 text-gray-700'
-                }`}
+                  }`}
               >
                 <mode.icon className="w-4 h-4" />
                 <span className="font-medium">{mode.label}</span>
@@ -358,18 +333,50 @@ const CreateEventFixed = ({ onEventCreate, onClose }) => {
           </div>
         )}
 
+        {/* Registration & Contact */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <LinkIcon className="w-4 h-4 inline mr-1" />
+              Registration Link (Optional)
+            </label>
+            <input
+              type="url"
+              name="registrationLink"
+              value={formData.registrationLink}
+              onChange={handleInputChange}
+              placeholder="https://forms.google.com/ai-ml-workshop-registration"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <AtSign className="w-4 h-4 inline mr-1" />
+              Contact (Email or Phone)
+            </label>
+            <input
+              type="text"
+              name="contactInfo"
+              value={formData.contactInfo}
+              onChange={handleInputChange}
+              placeholder="aiworkshop@gmail.com or +91-9876543210"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            />
+          </div>
+        </div>
+
         {/* Tags */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <Hash className="w-4 h-4 inline mr-1" />
-            Tags (Optional)
+            Hashtags / Keywords (Optional)
           </label>
           <input
             type="text"
             name="tags"
             value={formData.tags}
             onChange={handleInputChange}
-            placeholder="tech, networking, workshop (comma separated)"
+            placeholder="#AI, #MachineLearning, #Startup, #CareerGuidance"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
           />
         </div>

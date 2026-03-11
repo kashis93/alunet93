@@ -26,9 +26,9 @@ export const sendConnectionRequest = async (fromUser, toUserId) => {
         where("fromId", "==", fromUser.uid),
         where("toId", "==", toUserId)
     );
-    
+
     const existingSnap = await getDocs(existingQ);
-    
+
     if (!existingSnap.empty) {
         const existing = existingSnap.docs[0].data();
         if (existing.status === "pending") {
@@ -38,14 +38,14 @@ export const sendConnectionRequest = async (fromUser, toUserId) => {
             throw new Error("Already connected");
         }
     }
-    
+
     // Also check reverse direction
     const reverseQ = query(
         collection(db, "connections"),
         where("fromId", "==", toUserId),
         where("toId", "==", fromUser.uid)
     );
-    
+
     const reverseSnap = await getDocs(reverseQ);
     if (!reverseSnap.empty) {
         const existing = reverseSnap.docs[0].data();
@@ -134,12 +134,29 @@ export const subscribeToConnections = (userId, callback) => {
 };
 
 /**
+ * Listen to all outgoing connection requests from the current user.
+ * We only filter by fromId on the server to avoid composite index requirements.
+ * Client can derive 'pending' or 'accepted' states.
+ */
+export const subscribeToOutgoingRequests = (userId, callback) => {
+    const q = query(
+        collection(db, "connections"),
+        where("fromId", "==", userId)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+        const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(requests);
+    });
+};
+
+/**
  * Listen for activities from connections
  */
 export const subscribeToActivities = (connectionPartnerIds, callback) => {
     if (!connectionPartnerIds || connectionPartnerIds.length === 0) {
         callback([]);
-        return () => {};
+        return () => { };
     }
 
     // Firestore 'in' query supports up to 10 IDs
@@ -174,7 +191,7 @@ export const sendMessage = async (chatId, senderId, text) => {
     };
 
     await addDoc(collection(db, `chats/${chatId}/messages`), messageData);
-    
+
     const chatRef = doc(db, "chats", chatId);
     await updateDoc(chatRef, { lastUpdate: serverTimestamp() });
 };
@@ -255,9 +272,9 @@ export const subscribeToIncomingMessages = (userId, callback) => {
         subscribeToAllMessages(userId, partnerIds, callback, messageUnsubs);
     });
 
-    return () => { 
-        unsub1(); 
-        unsub2(); 
+    return () => {
+        unsub1();
+        unsub2();
         messageUnsubs.forEach(unsub => unsub?.());
     };
 };
@@ -280,11 +297,11 @@ const subscribeToAllMessages = (userId, partnerIds, callback, unsubs) => {
 
         const unsub = onSnapshot(q, (snapshot) => {
             const messages = snapshot.docs
-                .map(doc => ({ 
-                    id: doc.id, 
-                    ...doc.data(), 
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
                     chatId,
-                    partnerId 
+                    partnerId
                 }))
                 .filter(msg => msg.senderId !== userId);
 
@@ -298,4 +315,26 @@ const subscribeToAllMessages = (userId, partnerIds, callback, unsubs) => {
 
         unsubs.push(unsub);
     });
+};
+
+/**
+ * Get user suggestions (users not yet connected)
+ */
+export const getSuggestions = async (currentUserId) => {
+    // 1. Get all users
+    const usersSnap = await getDocs(collection(db, "users"));
+    const allUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // 2. Get current connections/requests
+    const connQ1 = query(collection(db, "connections"), where("fromId", "==", currentUserId));
+    const connQ2 = query(collection(db, "connections"), where("toId", "==", currentUserId));
+
+    const [snap1, snap2] = await Promise.all([getDocs(connQ1), getDocs(connQ2)]);
+
+    const connectedIds = new Set([currentUserId]);
+    snap1.docs.forEach(d => connectedIds.add(d.data().toId));
+    snap2.docs.forEach(d => connectedIds.add(d.data().fromId));
+
+    // 3. Filter out users who are already connected or the current user
+    return allUsers.filter(u => !connectedIds.has(u.id)).slice(0, 10);
 };

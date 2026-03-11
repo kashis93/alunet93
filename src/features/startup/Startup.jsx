@@ -1,70 +1,115 @@
-import { Button } from "@/components/ui";
-import { motion } from "framer-motion";
-import startupsData from "@/data/startupsData.json";
-import { useAuth } from "@/contexts/AuthContext.jsx";
-import { Rocket, Users, ShieldCheck, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
+import StartupCard from "./StartupCard";
+import StartupDetails from "./StartupDetails";
+import PostStartupPage from "./PostStartupPage";
+import { subscribeToStartups } from "../../services/dataService";
+import StartupFilters from "./StartupFilters";
 
 const Startup = () => {
-  const { requireAuth } = useAuth();
+  const [ideas, setIdeas] = useState([]);
+  const [selectedStartup, setSelectedStartup] = useState(null);
+  const [showPostPage, setShowPostPage] = useState(false);
+
+  /* FILTERS */
+  const [filters, setFilters] = useState({
+    stages: [],
+    sectors: [],
+    needs: []
+  });
+
+  useEffect(() => {
+    const unsubscribe = subscribeToStartups((data) => {
+      setIdeas(data);
+    });
+    return unsubscribe;
+  }, []);
+
+  /* DETAILS PAGE */
+  if (selectedStartup) {
+    return (
+      <StartupDetails
+        startup={selectedStartup}
+        goBack={() => setSelectedStartup(null)}
+      />
+    );
+  }
+
+  /* POST IDEA PAGE */
+  if (showPostPage) {
+    return (
+      <PostStartupPage
+        addStartup={(startup) => {
+          setShowPostPage(false);
+        }}
+        goBack={() => setShowPostPage(false)}
+      />
+    );
+  }
+
+  const filtered = ideas.filter(startup => {
+    if (filters.stages?.length > 0) {
+      if (!filters.stages.includes(startup.stage)) return false;
+    }
+    if (filters.sectors?.length > 0) {
+      if (!filters.sectors.includes(startup.sector)) return false;
+    }
+    if (filters.needs?.length > 0) {
+      // Check if any of the required needs match the startup's needs array
+      if (!startup.needs?.some(n => filters.needs.includes(n))) return false;
+    }
+    return true;
+  });
 
   return (
-    <div className="container mx-auto px-4 py-10">
-      <div className="mb-12">
-        <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">Startup Hub</h1>
-        <p className="text-muted-foreground mt-2 text-lg">Celebrating DIPP registered ventures from the LDCE ecosystem</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {startupsData.map((s, i) => (
-          <motion.div
-            key={s.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="group relative bg-card rounded-2xl p-8 shadow-sm hover:shadow-xl transition-all border border-border overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-16 -mt-16 transition-all group-hover:bg-primary/10" />
-
-            <div className="relative flex flex-col md:flex-row gap-6">
-              <div className="h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                <Rocket className="h-8 w-8 md:h-10 md:w-10 text-primary" />
-              </div>
-
-              <div className="flex-1 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <h2 className="text-2xl font-bold text-gray-900">{s.name}</h2>
-                  <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full border border-green-100">
-                    <ShieldCheck className="h-4 w-4" />
-                    <span className="text-xs font-bold uppercase tracking-wider">DIPP: {s.dippNumber}</span>
-                  </div>
-                </div>
-
-                <p className="text-muted-foreground leading-relaxed">{s.description}</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                  <div className="p-3 bg-muted/50 rounded-xl">
-                    <p className="text-[10px] uppercase text-muted-foreground font-bold mb-1 tracking-widest">Founder</p>
-                    <p className="font-semibold text-sm flex items-center gap-2">
-                      <Users className="h-4 w-4 text-primary" />
-                      {s.founder}
-                    </p>
-                  </div>
-                  <div className="flex items-end">
-                    <Button
-                      className="w-full py-6 rounded-xl gradient-primary text-primary-foreground shadow-lg shadow-primary/20 gap-2"
-                      onClick={() => {
-                        window.location.href = `mailto:secretary@ldcealumni.net?subject=Inquiry regarding ${s.name}`;
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Connect to Venture
-                    </Button>
-                  </div>
-                </div>
-              </div>
+    <div className="min-h-screen bg-slate-50/50">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* HEADER & ACTION BAR */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-8">
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Startups</h1>
+              <div className="h-8 w-px bg-slate-200"></div>
+              <p className="text-sm font-bold text-slate-500">{filtered.length} Ventures</p>
             </div>
-          </motion.div>
-        ))}
+
+            <button
+              onClick={() => setShowPostPage(true)}
+              className="w-full lg:w-auto bg-purple-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/20 active:scale-95 ml-auto"
+            >
+              + Launch Startup
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar Filters */}
+          <div className="lg:w-72 shrink-0">
+            <StartupFilters
+              filters={filters}
+              onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
+            />
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1">
+            {/* FEED */}
+            <div className="grid md:grid-cols-2 gap-8">
+              {filtered.length === 0 ? (
+                <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
+                  <p className="text-slate-400 text-lg font-bold">No startups found matching these filters...</p>
+                </div>
+              ) : (
+                filtered.map(startup => (
+                  <StartupCard
+                    key={startup.id}
+                    startup={startup}
+                    onClick={() => setSelectedStartup(startup)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
