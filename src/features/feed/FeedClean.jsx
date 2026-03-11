@@ -30,6 +30,24 @@ const FeedClean = () => {
   const [connectedIds, setConnectedIds] = useState(new Set());
   const [pendingIds, setPendingIds] = useState(new Set());
   const [carouselIndex, setCarouselIndex] = useState({});
+  const [commentInputs, setCommentInputs] = useState({});
+
+  const renderPostContent = (content) => {
+    if (!content) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = content.split(urlRegex);
+
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
   const toJSDate = (v) => {
     try {
       if (!v) return new Date();
@@ -240,6 +258,18 @@ const FeedClean = () => {
 
       if (!post) {
         console.error('Post not found locally:', postId);
+        // Fallback: try direct fetch if local post is stale
+        const snap = await getDoc(postRef);
+        if (snap.exists()) {
+          const remoteLikes = snap.data().likes || [];
+          if (remoteLikes.includes(user.uid)) {
+            await updateDoc(postRef, { likes: arrayRemove(user.uid) });
+          } else {
+            await updateDoc(postRef, { likes: arrayUnion(user.uid) });
+          }
+        } else {
+          toast.error('Post not found.');
+        }
         return;
       }
 
@@ -583,8 +613,10 @@ const FeedClean = () => {
                   </div>
 
                   {/* Post Content */}
-                  <div className="px-4 pb-3">
-                    <p className="text-gray-900 leading-relaxed">{post.content}</p>
+                  <div className="p-5 pt-2">
+                    <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+                      {renderPostContent(post.content)}
+                    </p>
                   </div>
 
                   {/* Post Media */}

@@ -288,11 +288,10 @@ const Opportunities = () => {
           </main>
         </div>
       </div>
-
       {/* Post Opportunity Modal - Professional Form */}
       <Dialog open={showPostForm} onOpenChange={setShowPostForm}>
         <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-3xl max-h-[90vh] flex flex-col">
-          <div className="bg-blue-600 p-8 text-white relative">
+          <div className="bg-blue-600 p-8 text-white relative shrink-0">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold">Post an Opportunity</DialogTitle>
               <DialogDescription className="text-blue-100 text-sm mt-1">
@@ -302,138 +301,146 @@ const Opportunities = () => {
             <div className="absolute -right-4 -bottom-4 opacity-10">
               <Building2 className="h-32 w-32" />
             </div>
+            <button
+              onClick={() => setShowPostForm(false)}
+              className="absolute top-4 right-4 text-white/60 hover:text-white transition"
+            >
+              <X className="h-6 w-6" />
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-thin scrollbar-thumb-gray-200">
+
+          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
             <form onSubmit={handlePostSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2 col-span-2">
-                  <label className="text-sm font-bold text-gray-700">Opportunity Title</label>
-                  <div className="max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
-                    <form onSubmit={handlePostSubmit} className="space-y-6 pt-4 pb-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Opportunity Title</label>
-                          <Input
-                            placeholder="e.g. Senior Software Engineer"
-                            required
-                            value={formData.title}
-                            onChange={e => setFormData({ ...formData, title: e.target.value })}
-                            className="rounded-xl border-slate-200 h-12 focus:ring-blue-500"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Company Name</label>
-                          <Input
-                            placeholder="e.g. Google India"
-                            required
-                            value={formData.company}
-                            onChange={e => setFormData({ ...formData, company: e.target.value })}
-                            className="rounded-xl border-slate-200 h-12"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Location</label>
-                          <Input
-                            placeholder="e.g. Bangalore, KA"
-                            required
-                            value={formData.location}
-                            onChange={e => setFormData({ ...formData, location: e.target.value })}
-                            className="rounded-xl border-slate-200 h-12"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Work Mode</label>
-                          <select
-                            className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
-                            value={formData.workMode}
-                            onChange={e => setFormData({ ...formData, workMode: e.target.value })}
-                          >
-                            <option value="On-site">On-site</option>
-                            <option value="Remote">Remote</option>
-                            <option value="Hybrid">Hybrid</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Job Type</label>
-                          <select
-                            className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
-                            value={formData.type}
-                            onChange={e => setFormData({ ...formData, type: e.target.value })}
-                          >
-                            <option value="Full-time">Full-time</option>
-                            <option value="Internship">Internship</option>
-                            <option value="Contract">Contract</option>
-                            <option value="Part-time">Part-time</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Application Deadline</label>
-                          <Input
-                            type="date"
-                            required
-                            value={formData.deadline}
-                            onChange={e => setFormData({ ...formData, deadline: e.target.value })}
-                            className="rounded-xl border-slate-200 h-12"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Salary / Stipend</label>
-                        <Input
-                          placeholder="e.g. 12LPA - 15LPA or 25k/month"
-                          value={formData.salary}
-                          onChange={e => setFormData({ ...formData, salary: e.target.value })}
-                          className="rounded-xl border-slate-200 h-12"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Application Link / Email</label>
-                        <Input
-                          placeholder="https://company.com/apply or careers@company.com"
-                          required
-                          value={formData.applicationLink}
-                          onChange={e => setFormData({ ...formData, applicationLink: e.target.value })}
-                          className="rounded-xl border-slate-200 h-12"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-black text-slate-700 uppercase tracking-wider">Required Skills (comma separated)</label>
-                        <Input
-                          placeholder="React, Node.js, Python..."
-                          value={formData.skills}
-                          onChange={e => setFormData({ ...formData, skills: e.target.value })}
-                          className="rounded-xl border-slate-200 h-12"
-                        />
-                      </div>
-
-                      <div className="flex gap-4 pt-6 sticky bottom-0 bg-white border-t border-slate-50">
-                        <Button type="button" variant="outline" onClick={() => setShowPostForm(false)} className="flex-1 rounded-xl h-12 font-black uppercase tracking-widest text-xs">
-                          Cancel
-                        </Button>
-                        <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-500/20">
-                          Publish Job
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Opportunity Title</label>
+                  <Input
+                    placeholder="e.g. Senior Software Engineer"
+                    required
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    className="rounded-xl border-slate-200 h-12 focus:ring-blue-500"
+                  />
                 </div>
-              </DialogContent>
-            </Dialog>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Company Name</label>
+                  <Input
+                    placeholder="e.g. Google India"
+                    required
+                    value={formData.company}
+                    onChange={e => setFormData({ ...formData, company: e.target.value })}
+                    className="rounded-xl border-slate-200 h-12"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Location</label>
+                  <Input
+                    placeholder="e.g. Bangalore, KA"
+                    required
+                    value={formData.location}
+                    onChange={e => setFormData({ ...formData, location: e.target.value })}
+                    className="rounded-xl border-slate-200 h-12"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Work Mode</label>
+                  <select
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
+                    value={formData.workMode}
+                    onChange={e => setFormData({ ...formData, workMode: e.target.value })}
+                  >
+                    <option value="On-site">On-site</option>
+                    <option value="Remote">Remote</option>
+                    <option value="Hybrid">Hybrid</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Job Type</label>
+                  <select
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
+                    value={formData.type}
+                    onChange={e => setFormData({ ...formData, type: e.target.value })}
+                  >
+                    <option value="Full-time">Full-time</option>
+                    <option value="Internship">Internship</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Part-time">Part-time</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Application Deadline</label>
+                  <Input
+                    type="date"
+                    required
+                    value={formData.deadline}
+                    onChange={e => setFormData({ ...formData, deadline: e.target.value })}
+                    className="rounded-xl border-slate-200 h-12"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Salary / Stipend Info</label>
+                <Input
+                  placeholder="e.g. 12LPA - 15LPA or 25k/month"
+                  value={formData.salary}
+                  onChange={e => setFormData({ ...formData, salary: e.target.value })}
+                  className="rounded-xl border-slate-200 h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Application Link / Email</label>
+                <Input
+                  placeholder="https://company.com/apply or careers@company.com"
+                  required
+                  value={formData.applicationLink}
+                  onChange={e => setFormData({ ...formData, applicationLink: e.target.value })}
+                  className="rounded-xl border-slate-200 h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Required Skills (comma separated)</label>
+                <Input
+                  placeholder="React, Node.js, Python..."
+                  value={formData.skills}
+                  onChange={e => setFormData({ ...formData, skills: e.target.value })}
+                  className="rounded-xl border-slate-200 h-12"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-6 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowPostForm(false)}
+                  className="flex-1 rounded-xl h-12 font-black uppercase tracking-widest text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-500/20"
+                >
+                  Publish Role
+                </Button>
+              </div>
+            </form>
           </div>
-          );
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 };
 
-          export default Opportunities;
-          ```
+export default Opportunities;
